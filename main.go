@@ -15,7 +15,7 @@ var (
 	kernel32        = syscall.NewLazyDLL("kernel32.dll")
 	procCreateMutex = kernel32.NewProc("CreateMutexW")
 	user32          = syscall.MustLoadDLL("user32.dll")
-	MUTEX           = "SysTimer"
+	MUTEX           = "Global defender"
 )
 
 func CheckErr(err error) {
