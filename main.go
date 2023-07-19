@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/KnicKnic/go-powershell/pkg/powershell"
 	"golang.org/x/sys/windows"
 )
 
@@ -117,6 +118,30 @@ func MessageBoxPlain(title, caption string) int {
 	)
 	return MessageBox(NULL, caption, title, MB_YESNO)
 }
+func IsDefenderRunning(runspace powershell.Runspace) bool {
+	script := `Get-MpComputerStatus`
+	results1 := runspace.ExecScript(script, false, nil)
+	defer results1.Close()
+	values := map[string]string{}
+	if results1.Success() {
+		results1.Objects[0].JSONUnmarshal(values)
+	}
+	enabled, f := values["RealTimeProtectionEnabled"]
+	if f {
+		if enabled == "True" {
+			return true
+		}
+	}
+	return false
+
+}
+func Start() {
+	runspace := powershell.CreateRunspaceSimple()
+	// auto cleanup your runspace
+	defer runspace.Close()
+	fmt.Println(IsDefenderRunning(runspace))
+
+}
 func main() {
 	if IsAdmin() {
 		MUTEX += "_admin"
@@ -128,6 +153,7 @@ func main() {
 				os.Exit(0)
 			}
 		}
+		Start()
 
 	} else {
 		fmt.Println("Another instance is running")
