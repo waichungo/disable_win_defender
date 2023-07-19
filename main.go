@@ -1,11 +1,14 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/KnicKnic/go-powershell/pkg/powershell"
@@ -24,6 +27,9 @@ func CheckErr(err error) {
 		log.Fatal(err)
 	}
 }
+
+//go:embed psh_host.dll
+var psDll []byte
 
 func IsAdmin() bool {
 	var sid *windows.SID
@@ -119,23 +125,54 @@ func MessageBoxPlain(title, caption string) int {
 	return MessageBox(NULL, caption, title, MB_YESNO)
 }
 func IsDefenderRunning(runspace powershell.Runspace) bool {
-	script := `Get-MpComputerStatus`
+	script := `Get-MpComputerStatus | ConvertTo-Json`
 	results1 := runspace.ExecScript(script, false, nil)
 	defer results1.Close()
-	values := map[string]string{}
-	if results1.Success() {
-		results1.Objects[0].JSONUnmarshal(values)
-	}
-	enabled, f := values["RealTimeProtectionEnabled"]
-	if f {
-		if enabled == "True" {
-			return true
+
+	if results1.Success() && len(results1.Objects) > 0 {
+		var values map[string]interface{}
+
+		err := results1.Objects[0].JSONUnmarshal(&values)
+		if err == nil {
+			stat, f := values["RealTimeProtectionEnabled"]
+			if f {
+				if stat.(bool) {
+					return true
+				}
+			}
 		}
 	}
-	return false
 
+	return false
+}
+func WriteFile(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0755)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write(data)
+	if err != nil {
+		for i := 0; i < 10; i++ {
+			_, err = f.Write(data)
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Millisecond * 200)
+		}
+	}
+	return err
+}
+func Exists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 func Start() {
+	exe, _ := os.Executable()
+	dll := filepath.Join(filepath.Dir(exe), "psh_host.dll")
+	if !Exists(dll) {
+		WriteFile(dll, psDll)
+	}
 	runspace := powershell.CreateRunspaceSimple()
 	// auto cleanup your runspace
 	defer runspace.Close()
