@@ -1,3 +1,4 @@
 #ifndef NATIVE_H
-
-void DisableDefender(BOOL disable ){}
+#define NATIVE_H
+void DisableDefender(int disable );
+#endif

