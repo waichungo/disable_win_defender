@@ -1,6 +1,6 @@
 package native
 
-//#include"native.h""
+//#include"native.h"
 import "C"
 
 func DisableDefenderWithRegistry(disable bool) {
