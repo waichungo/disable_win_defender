@@ -123,7 +123,7 @@ func IsDefenderRunning() bool {
 	return false
 }
 func DisableDefender(disable bool) bool {
-	//state := "true"
+	state := "true"
 	if !disable {
 		state = "false"
 	}
